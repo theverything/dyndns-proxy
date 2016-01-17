@@ -8,6 +8,7 @@ var proxy = httpProxy.createProxyServer({});
 
 var IP_FILE = path.join(__dirname, 'ip.txt');
 var AUTH_TOKEN = process.env.AUTH_TOKEN;
+var PROXY_PORT = process.env.PROXY_PORT;
 
 var server = http.createServer(function(req, res) {
   var uri = url.parse(req.url, true);
@@ -17,10 +18,11 @@ var server = http.createServer(function(req, res) {
   if (pathname === '/update-ip' && query.auth === AUTH_TOKEN && query.ip) {
     fs.writeFile(IP_FILE, query.ip, function (err) {
       if (err) {
-        console.log('ERROR: ' + err);
+        console.error('ERROR: ' + err);
         res.writeHead(500, { 'Content-Type': 'text/plain'});
         res.write(err);
       } else {
+        console.log('UPDATE: ' + query.ip);
         res.writeHead(200, { 'Content-Type': 'text/plain'});
         res.write('success');
       }
@@ -28,9 +30,20 @@ var server = http.createServer(function(req, res) {
     });
   } else {
     fs.readFile(IP_FILE, function (err, ip) {
+      var target;
+
       if (ip) {
-        proxy.web(req, res, { target: 'http://' + ip });
+        target = 'http://' + ip + ':' + PROXY_PORT;
+
+        console.log('PROXY: ' + target + uri.path);
+        proxy.web(req, res, { target: target }, function (err) {
+          console.log('PROXY_ERROR: ' + err);
+          res.writeHead(500, { 'Content-Type': 'text/plain'});
+          res.write(err);
+          res.end();
+        });
       } else {
+        console.log('ERROR: missing ip');
         res.writeHead(424, { 'Content-Type': 'text/plain'});
         res.write('missing ip');
         res.end();
